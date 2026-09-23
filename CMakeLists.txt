@@ -59,7 +59,20 @@ if(PALADIO_BUILD_PYTHON)
     )
 
     install(TARGETS paladio_core DESTINATION .)
+    install(FILES src/paladio_core.pyi src/py.typed DESTINATION .)
 endif()
+
+# Installation rules for native C++ library and headers
+include(GNUInstallDirs)
+install(TARGETS paladio_engine_static
+    EXPORT paladio_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(DIRECTORY include/paladio
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
 
 # C++ Testing with GoogleTest
 if(PALADIO_BUILD_TESTS)

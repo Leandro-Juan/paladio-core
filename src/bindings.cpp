@@ -101,14 +101,14 @@ PYBIND11_MODULE(paladio_core, m) {
         py::buffer_info cost_buf = costs.request();
 
         if (dur_buf.ndim != 1 || cost_buf.ndim != 1 || dur_buf.shape[0] != cost_buf.shape[0]) {
-          throw std::runtime_error(
+          throw py::value_error(
               "Transit matrices must be flattened 1D "
               "arrays of the same length.");
         }
 
         size_t expected_size = pois.size() * pois.size();
         if (dur_buf.shape[0] != static_cast<py::ssize_t>(expected_size)) {
-          throw std::runtime_error(
+          throw py::value_error(
               "Transit matrices must have size exactly equal to N*N where N is "
               "the number of POIs.");
         }

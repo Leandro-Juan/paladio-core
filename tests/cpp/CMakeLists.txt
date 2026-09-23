@@ -24,12 +24,12 @@ target_compile_definitions(paladio_tests PRIVATE PALADIO_TESTING=1)
 target_include_directories(paladio_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_compile_options(paladio_tests PRIVATE
-  $<$<CONFIG:Debug>:-g -Og -fsanitize=address,undefined>
+  $<$<AND:$<BOOL:${PALADIO_ENABLE_SANITIZERS}>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>>:-g -Og -fsanitize=address,undefined>
   $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Werror>
   $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Werror>
 )
 target_link_options(paladio_tests PRIVATE
-  $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+  $<$<AND:$<BOOL:${PALADIO_ENABLE_SANITIZERS}>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>>:-fsanitize=address,undefined>
 )
 
 include(GoogleTest)

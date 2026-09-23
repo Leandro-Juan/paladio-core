@@ -255,7 +255,5 @@ def test_engine_resilience_malformed_input(default_config):
     costs = np.zeros(50, dtype=np.float64)
 
     # Act & Assert
-    with pytest.raises(
-        Exception
-    ):  # Assuming PyBind11 raises an exception or we catch it
+    with pytest.raises(ValueError):
         paladio_core.optimize_itinerary(pois, durations, costs, default_config)

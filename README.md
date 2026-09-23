@@ -34,6 +34,7 @@ Combinatorial tour planning over arbitrary metric graphs under simultaneous time
 
 ---
 
+<a id="zero-allocation-hot-path-architecture"></a>
 > ### ⚡ Zero-Allocation Hot-Path Architecture
 > 
 > High-throughput systems cannot tolerate heap contention, cache thrashing, or non-deterministic OS allocator latency. `paladio-core` implements strict systems-level guarantees:
@@ -103,6 +104,8 @@ flowchart TD
 Install via pip:
 ```bash
 pip install paladio-core
+# Or install directly from source repository:
+pip install git+https://github.com/Leandro-Juan/paladio-core.git
 ```
 
 Solve an itinerary in 7 lines:

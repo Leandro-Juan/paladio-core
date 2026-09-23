@@ -4,14 +4,17 @@ This tutorial walks you through installing `paladio-core` and generating an opti
 
 ---
 
-## 1. Installation
-
 Install via pip:
 ```bash
 pip install paladio-core
 ```
 
-Or build from source in your Python environment:
+Or install directly from the GitHub repository:
+```bash
+pip install git+https://github.com/Leandro-Juan/paladio-core.git
+```
+
+Or clone and build from local source:
 ```bash
 git clone https://github.com/Leandro-Juan/paladio-core.git
 cd paladio-core

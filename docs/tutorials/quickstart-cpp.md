@@ -27,6 +27,9 @@ add_executable(my_routing_app main.cpp)
 target_link_libraries(my_routing_app PRIVATE paladio::engine)
 ```
 
+> [!TIP]
+> You can point `GIT_TAG` to a specific release tag such as `v1.0.0` or track the latest development branch using `GIT_TAG main`.
+
 ---
 
 ## 2. Writing `main.cpp`
