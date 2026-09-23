@@ -56,7 +56,7 @@ $$\rho_i = \frac{s_i}{d_i}$$
 
 If:
 
-$$\text{current\_score} + \text{knapsack\_upper\_bound} \le \text{best\_score\_found}$$
+$$\text{Score}_{\text{current}} + \text{Bound}_{\text{knapsack}} \le \text{Score}_{\text{incumbent}}$$
 
 the current search branch cannot mathematically produce a superior tour. The entire subtree is pruned immediately without examining any deeper permutations.
 

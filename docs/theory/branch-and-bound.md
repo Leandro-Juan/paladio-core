@@ -8,7 +8,7 @@ This document explains the core pruning mechanism inside `paladio-core`: the **C
 
 In combinatorial branch-and-bound algorithms, search tree expansion must be pruned as early as possible. If an algorithm knows an upper bound $\bar{U}(S)$ on the maximum score achievable from a partial state $S$, and:
 
-$$\text{current\_score}(S) + \bar{U}(S) \le \text{best\_known\_score}$$
+$$\text{Score}_{\text{current}}(S) + \bar{U}(S) \le \text{Score}_{\text{incumbent}}$$
 
 then no descendant of $S$ can surpass the incumbent solution. The entire subtree rooted at $S$ can be safely discarded.
 

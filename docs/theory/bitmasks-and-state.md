@@ -43,10 +43,10 @@ Let State $A$ and State $B$ represent two partial paths arriving at node $u$ wit
 State $A$ **Pareto-dominates** State $B$ if and only if:
 
 $$\begin{aligned}
-\text{time}(A) &\le \text{time}(B) \\
-\text{cost}(A) &\le \text{cost}(B) \\
-\text{score}(A) &\ge \text{score}(B) \\
-\text{active\_time}(A) &\le \text{active\_time}(B)
+\text{Time}(A) &\le \text{Time}(B) \\
+\text{Cost}(A) &\le \text{Cost}(B) \\
+\text{Score}(A) &\ge \text{Score}(B) \\
+\text{ActiveTime}(A) &\le \text{ActiveTime}(B)
 \end{aligned}$$
 
 with at least one strict inequality.

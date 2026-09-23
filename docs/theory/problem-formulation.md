@@ -14,7 +14,7 @@ Let $G = (V, E)$ be a directed, complete metric graph where:
   - A dwell or visit duration $d_i \ge 0$.
   - A financial visit cost $c_i \ge 0$.
   - A time window $[e_i, l_i]$, where $e_i$ is the earliest allowable arrival time, and $l_i$ is the latest allowable departure time.
-  - A categorical type $T_i \in \{\text{ATTRACTION}, \text{HOTEL}, \text{RESTAURANT\_BREAKFAST}, \dots\}$.
+  - A categorical type $T_i \in \{\text{ATTRACTION}, \text{HOTEL}, \text{BREAKFAST}, \text{LUNCH}, \text{DINNER}, \text{BAR}\}$.
 - Each directed edge $(i, j) \in E$ has:
   - A travel duration $t_{ij} \ge 0$ in minutes.
   - A transit cost $k_{ij} \ge 0$.
