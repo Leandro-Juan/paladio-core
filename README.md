@@ -81,16 +81,16 @@ The search engine operates as a recursive Branch & Bound search tree. Before exp
 
 ```mermaid
 flowchart TD
-    A[Start Search Node u] --> B{Budget or Time Exceeded?}
-    B -- Yes --> C[Prune Branch: Infeasible]
-    B -- No --> D{Pareto Dominance Check}
+    A["Start Search Node u"] --> B{"Budget or Time Exceeded?"}
+    B -- Yes --> C["Prune Branch: Infeasible"]
+    B -- No --> D{"Pareto Dominance Check"}
     D -- Dominated --> C
-    D -- Non-Dominated --> E[Compute Continuous Fractional Knapsack Bound]
+    D -- Non-Dominated --> E["Compute Continuous Fractional Knapsack Bound"]
     E --> F{"Upper Bound + Score ≤ Current Best?"}
     F -- Yes --> C
-    F -- No --> G[Update Best Incumbent Solution]
-    G --> H[Sort Candidates by Score Density s_i / d_i]
-    H --> I[Recurse into Next POI with Bitmask Update]
+    F -- No --> G["Update Best Incumbent Solution"]
+    G --> H["Sort Candidates by Score Density s_i / d_i"]
+    H --> I["Recurse into Next POI with Bitmask Update"]
 ```
 
 ---
