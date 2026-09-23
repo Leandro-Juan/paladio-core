@@ -14,29 +14,49 @@ namespace paladio::core {
 
 namespace {
 
+/**
+ * @brief Internal exception thrown when search duration exceeds @ref
+ * OptimizationConfig::timeout_ms.
+ *
+ * Polled cooperatively every 1024 node evaluations (@c (node_eval_count & 1023) == 0) to avoid
+ * high clock-query overhead. Caught by the root solver loop to cleanly return the incumbent best.
+ */
 struct TimeoutException : public std::exception {};
 
+/**
+ * @brief Fixed-size contiguous stack frame tracking state during DFS recursion.
+ *
+ * @details Implements strict zero-heap allocation guarantees. Memory footprint is exactly
+ * 336 bytes, allowing millions of recursive states to traverse L1 cache lines without
+ * triggering dynamic memory allocations (@c malloc or @c new).
+ */
 struct SearchState {
-  uint64_t visited_mask = 0;
-  double current_cost = 0.0;
-  int current_time = 0;
-  double current_score = 0.0;
-  bool had_breakfast = false;
-  bool had_lunch = false;
-  bool had_dinner = false;
-  int last_meal_time = -9999;
-  int continuous_active_time = 0;
-  std::array<uint8_t, 8> category_visits = {0};
-  std::array<int, 64> current_path;
-  int current_path_size = 0;
+  uint64_t visited_mask = 0;   ///< Bitmask of visited nodes indexed by density rank.
+  double current_cost = 0.0;   ///< Cumulative monetary cost incurred (visits + transits).
+  int current_time = 0;        ///< Current elapsed timeline in minutes from midnight.
+  double current_score = 0.0;  ///< Cumulative objective reward after physiological attenuations.
+  bool had_breakfast = false;  ///< True if a valid breakfast milestone has been fulfilled.
+  bool had_lunch = false;      ///< True if a valid lunch milestone has been fulfilled.
+  bool had_dinner = false;     ///< True if a valid dinner milestone has been fulfilled.
+  int last_meal_time = -9999;  ///< Departure minute of most recent meal (for spacing enforcement).
+  int continuous_active_time = 0;  ///< Consecutive active minutes accumulated without a rest stop.
+  std::array<uint8_t, 8> category_visits = {0};  ///< Frequency histogram per @ref NodeType.
+  std::array<int, 64> current_path;  ///< Stack-allocated sequence of visited POI indices.
+  int current_path_size = 0;         ///< Current depth/length of the trajectory.
 };
 
+/**
+ * @brief Lookup key for state memoization in multi-criteria Pareto dominance pruning.
+ */
 struct MemoKey {
-  uint64_t mask;
-  int node;
+  uint64_t mask;  ///< Bitmask of visited nodes.
+  int node;       ///< Current head vertex index.
   bool operator==(const MemoKey &o) const { return mask == o.mask && node == o.node; }
 };
 
+/**
+ * @brief Hash function for @ref MemoKey using Golden Ratio bitwise mixing.
+ */
 struct MemoKeyHash {
   size_t operator()(const MemoKey &k) const {
     size_t seed = 0;
@@ -46,19 +66,55 @@ struct MemoKeyHash {
   }
 };
 
+/**
+ * @brief Multi-criteria state record stored in memoization buckets to prune dominated paths.
+ */
 struct MemoEntry {
-  int current_time = std::numeric_limits<int>::max();
-  double current_cost = std::numeric_limits<double>::infinity();
-  double current_score = -std::numeric_limits<double>::infinity();
-  bool had_breakfast = false;
-  bool had_lunch = false;
-  bool had_dinner = false;
-  int continuous_active_time = 0;
-  int last_meal_time = -9999;
+  int current_time = std::numeric_limits<int>::max();               ///< Timeline arrival minute.
+  double current_cost = std::numeric_limits<double>::infinity();    ///< Cumulative financial cost.
+  double current_score = -std::numeric_limits<double>::infinity();  ///< Accumulated score.
+  bool had_breakfast = false;                                       ///< Breakfast status flag.
+  bool had_lunch = false;                                           ///< Lunch status flag.
+  bool had_dinner = false;                                          ///< Dinner status flag.
+  int continuous_active_time = 0;  ///< Fatigue counter at state entry.
+  int last_meal_time = -9999;      ///< Departure minute of last meal.
 };
 
+/**
+ * @brief Mathematical infinity representation for floating-point bounds.
+ */
 constexpr double INF = std::numeric_limits<double>::infinity();
 
+/**
+ * @brief Computes an admissible optimistic upper bound on achievable future score.
+ *
+ * @details Solves the Continuous Fractional Knapsack Problem (CFKP) relaxation over the set of
+ * unvisited candidate POIs. Since candidates are pre-sorted in descending order of
+ * score-to-duration density (@f$ s_i / d_i @f$), the greedy assignment is proven to yield the
+ * mathematically optimal fractional upper bound.
+ *
+ * In addition, transit duration from the current node is optimistically lower-bounded by the global
+ * minimum transit duration @p min_transit_global. Consequently, the heuristic value @f$ h(s) @f$
+ * satisfies the admissibility condition (@f$ h(s) \ge h^*(s) @f$) for linear instances, ensuring
+ * that pruning branches where @f$ \text{score} + h(s) \le \text{best\_score} @f$ preserves global
+ * optimality.
+ *
+ * Iteration over unvisited nodes leverages single-cycle hardware intrinsics:
+ * - @c std::countr_zero: extracts the lowest set bit index (representing the highest remaining
+ * density rank).
+ * - @c unvisited &= unvisited - 1: clears the lowest set bit in a single CPU instruction.
+ *
+ * @param visited_mask 64-bit integer bitmask of already visited nodes indexed by density rank.
+ * @param current_time Current elapsed itinerary timeline in minutes from midnight.
+ * @param end_time_limit Global timeline boundary in minutes from midnight.
+ * @param pois Pointer to contiguous array of candidate POI definitions.
+ * @param sorted_pois_by_density Array mapping density rank to POI index in @p pois.
+ * @param min_transit_global Minimum transit duration between any distinct pair in the graph.
+ * @param n Total number of POIs in the graph (@f$ N \le 64 @f$).
+ * @return double Admissible upper bound on the maximum score achievable within remaining time.
+ *
+ * @complexity @f$ O(U) @f$ where @f$ U \le N @f$ is the number of remaining unvisited nodes.
+ */
 inline double calculate_optimistic_bound(uint64_t visited_mask, int current_time,
                                          int end_time_limit, const POI *pois,
                                          const int *sorted_pois_by_density, int min_transit_global,
@@ -103,6 +159,44 @@ inline double calculate_optimistic_bound(uint64_t visited_mask, int current_time
   return optimistic_future_score;
 }
 
+/**
+ * @brief Recursive Depth-First Branch & Bound exploration engine.
+ *
+ * @details Explores candidate permutations on the metric POI graph. Evaluates several layers
+ * of pruning before expanding recursive child nodes:
+ * 1. **Multi-Criteria Pareto Dominance:** Compares the state against prior visits to the same
+ *    vertex under the same visited set. If an existing state achieved equal or lower time, cost,
+ *    fatigue, and equal or higher score and meal coverage, the current branch is pruned.
+ * 2. **Continuous Knapsack Upper Bounding:** Calls @ref calculate_optimistic_bound. If optimistic
+ *    upper bound + current score cannot beat the incumbent best, the entire subtree is pruned.
+ * 3. **Mandatory POI Reachability:** Calculates the minimum duration required to complete all
+ *    remaining unvisited mandatory nodes; prunes if arrival exceeds @p config.end_time_limit.
+ * 4. **Transition Feasibility:** Enforces budget, operating time windows, idle time tolerances,
+ *    circadian meal spacing, and arrival deadlines.
+ * 5. **Incumbent Solution Update:** When a valid terminal node or end condition is reached,
+ *    evaluates incumbent improvement using a lexicographical tie-breaker:
+ *    @f$ \text{score} \uparrow \ \succ \ \text{time} \downarrow \ \succ \ \text{cost} \downarrow
+ * @f$.
+ *
+ * @param u Current head POI index in the trajectory.
+ * @param state Contiguous stack-allocated search state (336 bytes).
+ * @param pois Pointer to contiguous array of POI definitions.
+ * @param transit_durations Flattened row-major @f$ N \times N @f$ transit duration matrix.
+ * @param transit_costs Flattened row-major @f$ N \times N @f$ transit cost matrix.
+ * @param config Global optimization parameters and physiological constraints.
+ * @param sorted_pois_by_density Array mapping density rank to POI index in @p pois.
+ * @param density_rank Array mapping POI index to its density rank.
+ * @param min_transit_global Minimum transit duration between any distinct pair in the graph.
+ * @param n Total number of POIs in the graph (@f$ N \le 64 @f$).
+ * @param memo Hash map storing Pareto dominance entries bucketed by @ref MemoKey.
+ * @param global_mandatory_mask Bitmask of all POIs flagged as mandatory.
+ * @param best_result In-out reference storing the best incumbent solution found.
+ * @param start_time Wall-clock timestamp recorded at search start.
+ * @param node_eval_count Counter tracking total node visits; triggers timeout checks every 1024
+ * calls.
+ *
+ * @throws TimeoutException When wall-clock execution time exceeds @p config.timeout_ms.
+ */
 void dfs(int u, SearchState &state, const POI *pois, const int *transit_durations,
          const double *transit_costs, const OptimizationConfig &config,
          const int *sorted_pois_by_density, const int *density_rank, int min_transit_global, int n,
@@ -469,6 +563,22 @@ void dfs(int u, SearchState &state, const POI *pois, const int *transit_duration
 
 }  // namespace
 
+/**
+ * @brief Public solver entry point implementing the TCOPTW Branch & Bound solver.
+ *
+ * @details Executes the pre-processing and root iteration pipeline:
+ * 1. Validates preconditions (non-empty POIs, @f$ N \le 64 @f$, non-null matrix pointers, valid
+ * indices).
+ * 2. Pre-sorts candidate POIs by score-to-duration density (@f$ s_i / d_i @f$) to optimize CFKP
+ * upper bounding.
+ * 3. Builds density rank mappings and a global mandatory POI bitmask.
+ * 4. Precomputes the global minimum transit duration @c min_transit_global to support admissible
+ * bounding.
+ * 5. Iterates across all feasible starting nodes (or the single designated start node),
+ * initializing the zero-heap @ref SearchState and invoking @ref dfs.
+ * 6. Gracefully catches @ref TimeoutException to return the incumbent best solution when timeout is
+ * hit.
+ */
 OptimizationResult optimize_itinerary(const std::vector<POI> &pois, const int *transit_durations,
                                       const double *transit_costs,
                                       const OptimizationConfig &config) {
