@@ -2,7 +2,7 @@ import json
 
 
 def main():
-    json_path = "/home/leandro/Code/Projects/Paladio/backend/engine_input_dump.json"
+    json_path = "backend/engine_input_dump.json"
     out_hpp = "real_pois_data.hpp"
 
     try:

@@ -1,6 +1,6 @@
-<div align="center">
+<img src="assets/logo.png" width="140" alt="Paladio Logo">
 
-# 🏛️ Paladio Core (`paladio-core`)
+# Paladio Core (`paladio-core`)
 
 **An ultra-fast, deterministic C++20 combinatorial routing engine with zero-copy Python bindings.**
 
