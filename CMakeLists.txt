@@ -57,6 +57,8 @@ if(PALADIO_BUILD_PYTHON)
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
     )
+
+    install(TARGETS paladio_core DESTINATION .)
 endif()
 
 # C++ Testing with GoogleTest
