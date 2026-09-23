@@ -1,0 +1,68 @@
+[build-system]
+requires = ["scikit-build-core>=0.9.0", "pybind11>=2.11.1"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "paladio-core"
+version = "1.0.0"
+description = "Deterministic C++20 combinatorial routing and orienteering solver with Python bindings"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Leandro Juan" }
+]
+keywords = [
+    "optimization",
+    "operations-research",
+    "combinatorial-optimization",
+    "orienteering-problem",
+    "tsptw",
+    "branch-and-bound",
+    "cpp20",
+    "pybind11"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "numpy>=1.20.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "numpy>=1.20.0"
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "pymdown-extensions>=10.7"
+]
+
+[project.urls]
+Homepage = "https://github.com/Leandro-Juan/paladio-core"
+Documentation = "https://leandro-juan.github.io/paladio-core/"
+Repository = "https://github.com/Leandro-Juan/paladio-core.git"
+Issues = "https://github.com/Leandro-Juan/paladio-core/issues"
+
+[tool.scikit-build]
+cmake.version = ">=3.20"
+cmake.build-type = "Release"
+cmake.define.PALADIO_BUILD_TESTS = "OFF"
+cmake.define.PALADIO_BUILD_PYTHON = "ON"
+wheel.expand-macos-universal-tags = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+python_files = ["test_*.py"]

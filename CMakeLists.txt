@@ -1,72 +1,66 @@
 cmake_minimum_required(VERSION 3.20)
-project(PaladioEngine VERSION 1.0 LANGUAGES CXX)
+project(PaladioEngine VERSION 1.0.0 LANGUAGES CXX)
+
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Fetch pybind11 for Python integration
-include(FetchContent)
-FetchContent_Declare(
-    pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG        v2.11.1
-)
-FetchContent_MakeAvailable(pybind11)
-
-# Fetch GoogleTest
-set(GTEST_VERSION v1.14.0)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/refs/tags/${GTEST_VERSION}.zip
-)
-FetchContent_MakeAvailable(googletest)
-
+# Build Options
+option(PALADIO_BUILD_TESTS "Build GoogleTest test suite" OFF)
 option(PALADIO_ENABLE_NATIVE "Enable -march=native optimization" OFF)
+option(PALADIO_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(PALADIO_BUILD_PYTHON "Build Python bindings via pybind11" ON)
 
-# Main Library
-pybind11_add_module(paladio_core src/engine.cpp src/bindings.cpp)
-target_include_directories(paladio_core PRIVATE include)
+include(FetchContent)
 
-set_target_properties(paladio_core PROPERTIES
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON
+# Core Static Library (Consumed by native C++ applications and test suites)
+add_library(paladio_engine_static STATIC
+    src/engine.cpp
+)
+add_library(paladio::engine ALIAS paladio_engine_static)
+
+target_include_directories(paladio_engine_static PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
-# Compiler optimizations and sanitizer flags (configurable via presets or CLI)
-target_compile_options(paladio_core PRIVATE
-    $<$<CONFIG:Debug>:-g -Og -fsanitize=address>
+target_compile_options(paladio_engine_static PRIVATE
+    $<$<BOOL:${PALADIO_ENABLE_SANITIZERS}>:-g -Og -fsanitize=address,undefined>
     $<$<AND:$<CONFIG:Release>,$<BOOL:${PALADIO_ENABLE_NATIVE}>>:-O3 -march=native -DNDEBUG>
     $<$<AND:$<CONFIG:Release>,$<NOT:$<BOOL:${PALADIO_ENABLE_NATIVE}>>>:-O3 -DNDEBUG>
     $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Werror>
-    $<$<CXX_COMPILER_ID:Clang>:-Weverything -Wno-c++98-compat>
+    $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Werror>
 )
 
-target_link_options(paladio_core PRIVATE
-    $<$<CONFIG:Debug>:-fsanitize=address>
+target_link_options(paladio_engine_static PUBLIC
+    $<$<BOOL:${PALADIO_ENABLE_SANITIZERS}>:-fsanitize=address,undefined>
 )
 
-# Testing
-add_executable(paladio_tests
-  tests/engine_test.cpp
-  tests/engine_stress_test.cpp
-  tests/engine_real_data_test.cpp
-  src/engine.cpp
-)
+# Python Module (paladio_core)
+if(PALADIO_BUILD_PYTHON)
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
 
-target_include_directories(paladio_tests PRIVATE include)
-# We have to exclude the pybind11 module macro from the tests to avoid duplicate main/module
-target_compile_definitions(paladio_tests PRIVATE -DPALADIO_TESTING=1)
+    pybind11_add_module(paladio_core src/bindings.cpp)
+    target_link_libraries(paladio_core PRIVATE paladio_engine_static)
 
-target_compile_options(paladio_tests PRIVATE
-    $<$<CONFIG:Debug>:-g -Og -fsanitize=address>
-    $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Werror>
-)
-target_link_options(paladio_tests PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
+    set_target_properties(paladio_core PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+    )
+endif()
 
-target_link_libraries(paladio_tests GTest::gtest GTest::gmock GTest::gtest_main)
-
-enable_testing()
-include(GoogleTest)
-gtest_discover_tests(paladio_tests)
-
+# C++ Testing with GoogleTest
+if(PALADIO_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests/cpp)
+endif()

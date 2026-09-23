@@ -1,0 +1,88 @@
+name: Paladio Core CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Job 1: C++ Matrix & Sanitizers
+  # Compiles native C++20 targets with AddressSanitizer and UndefinedBehaviorSanitizer
+  # across GCC and Clang. Runs GoogleTest test suite.
+  # --------------------------------------------------------------------------
+  cpp-sanitizers:
+    name: C++ (${{ matrix.compiler }}) + ASan/UBSan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        include:
+          - compiler: gcc
+            cc: gcc-13
+            cxx: g++-13
+          - compiler: clang
+            cc: clang-17
+            cxx: clang++-17
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ${{ matrix.cxx }} libasan8
+
+      - name: Configure CMake with Sanitizers & GoogleTest
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -B build -S . -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPALADIO_BUILD_TESTS=ON \
+            -DPALADIO_ENABLE_SANITIZERS=ON \
+            -DPALADIO_BUILD_PYTHON=OFF
+
+      - name: Build GoogleTest Targets
+        run: cmake --build build --target paladio_tests
+
+      - name: Run CTest under ASan/UBSan
+        run: ctest --test-dir build --output-on-failure
+
+  # --------------------------------------------------------------------------
+  # Job 2: Python Wheels & Pytest
+  # Builds cleanly via scikit-build-core in Release mode (no sanitizers) to prevent
+  # false positives from CPython's internal memory pools. Runs Pytest test suite.
+  # --------------------------------------------------------------------------
+  python-test:
+    name: Python ${{ matrix.python-version }} Wheel & Pytest
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build toolchain
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest numpy
+
+      - name: Build and Install paladio-core Wheel
+        run: pip install .[test]
+
+      - name: Run Pytest Test Suite
+        run: pytest tests/python/ -v

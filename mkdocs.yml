@@ -1,0 +1,78 @@
+site_name: Paladio Core
+site_description: High-performance C++20 combinatorial routing and orienteering solver with Python bindings
+site_author: Leandro Juan
+site_url: https://leandro-juan.github.io/paladio-core/
+repo_name: Leandro-Juan/paladio-core
+repo_url: https://github.com/Leandro-Juan/paladio-core
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://unpkg.com/katex@0.16.9/dist/katex.min.js
+  - https://unpkg.com/katex@0.16.9/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://unpkg.com/katex@0.16.9/dist/katex.min.css
+
+nav:
+  - Overview: index.md
+  - Benchmarks & Performance: benchmarks.md
+  - Tutorials:
+      - 5-Minute Python Quickstart: tutorials/quickstart-python.md
+      - 5-Minute C++ Quickstart: tutorials/quickstart-cpp.md
+  - How-To Guides:
+      - CMake FetchContent Integration: how-to/cmake-fetchcontent.md
+      - Tuning Human Realism: how-to/human-realism.md
+      - Sanitizers & Stress Testing: how-to/sanitize-and-debug.md
+  - Algorithmic Theory:
+      - TCOPTW Problem Formulation: theory/problem-formulation.md
+      - Branch & Bound Upper Bounding: theory/branch-and-bound.md
+      - 64-Bit Bitmasks & State Encoding: theory/bitmasks-and-state.md
+  - API Reference:
+      - C++20 Public API: reference/cpp-api.md
+      - Python Bindings API: reference/python-api.md

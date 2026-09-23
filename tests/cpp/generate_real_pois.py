@@ -22,7 +22,7 @@ def main():
 
     with open(out_hpp, "w") as f:
         f.write("#pragma once\n\n")
-        f.write('#include "engine.hpp"\n')
+        f.write('#include "paladio/engine.hpp"\n')
         f.write("#include <vector>\n\n")
         f.write("namespace paladio::core::test_data {\n\n")
 

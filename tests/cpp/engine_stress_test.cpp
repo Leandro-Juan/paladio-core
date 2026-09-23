@@ -1,6 +1,8 @@
-#include "engine.hpp"
-#include <gtest/gtest.h>
+#include "paladio/engine.hpp"
+
 #include <random>
+
+#include <gtest/gtest.h>
 
 using namespace paladio::core;
 
@@ -31,7 +33,7 @@ TEST_F(EngineStressTest, SixtyFourPOIDenseGraph) {
   // We make all transit times small so we can visit many nodes
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
-      transit_times.push_back({5, 1.0}); // 5 mins, 1 eur
+      transit_times.push_back({5, 1.0});  // 5 mins, 1 eur
     }
   }
 
@@ -44,7 +46,7 @@ TEST_F(EngineStressTest, SixtyFourPOIDenseGraph) {
   // or time limit to prune branches. Branch and bound with 64 nodes is O(N!)
   // so we need to limit the actual tree depth, but we still ensure we CAN
   // bitwise map node 63.
-  config.end_time_limit = 100; // Allows at most a few nodes
+  config.end_time_limit = 100;  // Allows at most a few nodes
 
   // Act
   auto result = optimize_itinerary(pois, transit_times, config);
@@ -62,8 +64,8 @@ TEST_F(EngineStressTest, MaximumBitmaskIndex) {
   std::vector<POI> pois(N, {NodeType::ATTRACTION, 0.0, 1.0, 0, 1440, 10});
   std::vector<TransitInfo> transit(N * N, {0, 0.0});
 
-  pois[0].type = NodeType::HOTEL;  // start
-  pois[63].type = NodeType::HOTEL; // end
+  pois[0].type = NodeType::HOTEL;   // start
+  pois[63].type = NodeType::HOTEL;  // end
 
   // Node 63 is the destination, but we give it a massive score so the algorithm
   // WANTS to go there

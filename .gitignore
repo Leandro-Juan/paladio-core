@@ -1,0 +1,42 @@
+# Build directories
+build/
+build_*/
+bin/
+lib/
+_deps/
+CMakeUserPresets.json
+
+# Compiled object files & shared libraries
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.pyd
+
+# Python virtual environments & cache
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+wheels/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation build outputs
+site/
+
+# IDE / Editor configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test outputs
+real_itinerary_output.json

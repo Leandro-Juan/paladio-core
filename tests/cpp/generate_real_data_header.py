@@ -69,7 +69,7 @@ async def generate():
 
     hpp_content = """#pragma once
 
-#include "engine.hpp"
+#include "paladio/engine.hpp"
 #include <vector>
 
 namespace paladio::core::test_data {

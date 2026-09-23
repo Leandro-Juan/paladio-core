@@ -1,10 +1,12 @@
-#include "engine.hpp"
-#include "real_pois_data.hpp"
+#include "paladio/engine.hpp"
+
 #include <algorithm>
 #include <fstream>
-#include <gtest/gtest.h>
 #include <iostream>
 #include <string>
+
+#include "real_pois_data.hpp"
+#include <gtest/gtest.h>
 
 using namespace paladio::core;
 using namespace paladio::core::test_data;
@@ -25,8 +27,7 @@ protected:
 
   void write_result_to_json(const OptimizationResult &result) {
     std::ofstream out("real_itinerary_output.json");
-    ASSERT_TRUE(out.is_open())
-        << "Failed to open real_itinerary_output.json for writing.";
+    ASSERT_TRUE(out.is_open()) << "Failed to open real_itinerary_output.json for writing.";
 
     out << "{\n";
     out << "  \"total_cost\": " << result.total_cost << ",\n";
@@ -53,8 +54,7 @@ protected:
         int prev_node = result.path[i - 1];
         transit_dur = transits[prev_node * num_nodes + node].duration;
         int arrival_time_before_wait = current_time + transit_dur;
-        arrival_time =
-            std::max(arrival_time_before_wait, pois[node].earliest_time);
+        arrival_time = std::max(arrival_time_before_wait, pois[node].earliest_time);
         idle_time = arrival_time - arrival_time_before_wait;
         start_time = arrival_time;
         end_time = start_time + pois[node].duration;
@@ -76,8 +76,7 @@ protected:
       out << "    {\n";
       out << "      \"id\": " << node << ",\n";
       out << "      \"name\": \"" << names[node] << "\",\n";
-      out << "      \"arrival_time\": \"" << format_time(arrival_time)
-          << "\",\n";
+      out << "      \"arrival_time\": \"" << format_time(arrival_time) << "\",\n";
       out << "      \"start_time\": \"" << format_time(start_time) << "\",\n";
       out << "      \"end_time\": \"" << format_time(end_time) << "\",\n";
       out << "      \"duration_mins\": " << pois[node].duration << ",\n";
@@ -93,8 +92,7 @@ protected:
     out << "}\n";
     out.close();
 
-    std::cout << "Successfully wrote output to real_itinerary_output.json"
-              << std::endl;
+    std::cout << "Successfully wrote output to real_itinerary_output.json" << std::endl;
   }
 };
 
@@ -133,7 +131,7 @@ TEST_F(ItineraryEngineRealDataTest, RealDataProducesValidItinerary) {
 
 TEST_F(ItineraryEngineRealDataTest, StrictBudgetPruningWithRealData) {
   // Arrange
-  config.max_budget = 5.0; // Restrict budget severely
+  config.max_budget = 5.0;  // Restrict budget severely
 
   // Act
   auto result = optimize_itinerary(pois, transits, config);
