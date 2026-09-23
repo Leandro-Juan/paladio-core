@@ -1,4 +1,6 @@
-<img src="assets/logo.png" width="140" alt="Paladio Logo">
+<div align="center">
+
+<img src="assets/logo_horizontal_dark.png" width="380" alt="Paladio Core">
 
 # Paladio Core (`paladio-core`)
 
