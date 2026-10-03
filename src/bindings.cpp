@@ -36,9 +36,9 @@ PYBIND11_MODULE(paladio_core, m) {
       .def_readwrite("cost", &TransitInfo::cost, "Financial cost of travel.");
 
   py::class_<POI>(m, "POI", "A Point of Interest node in the itinerary network.")
-      .def(py::init<NodeType, double, double, int, int, int, bool>(), py::arg("type"),
+      .def(py::init<NodeType, double, double, int, int, int, bool, uint8_t>(), py::arg("type"),
            py::arg("cost"), py::arg("score"), py::arg("earliest_time"), py::arg("latest_time"),
-           py::arg("duration"), py::arg("is_mandatory") = false)
+           py::arg("duration"), py::arg("is_mandatory") = false, py::arg("category_id") = 255)
       .def_readwrite("type", &POI::type)
       .def_readwrite("cost", &POI::cost)
       .def_readwrite("score", &POI::score)
@@ -48,12 +48,13 @@ PYBIND11_MODULE(paladio_core, m) {
       .def_readwrite("is_breakfast_spot", &POI::is_breakfast_spot)
       .def_readwrite("is_lunch_spot", &POI::is_lunch_spot)
       .def_readwrite("is_dinner_spot", &POI::is_dinner_spot)
-      .def_readwrite("is_mandatory", &POI::is_mandatory);
+      .def_readwrite("is_mandatory", &POI::is_mandatory)
+      .def_readwrite("category_id", &POI::category_id);
 
   py::class_<OptimizationConfig>(m, "OptimizationConfig",
                                  "Global constraints for the routing problem.")
       .def(py::init<double, std::optional<int>, std::optional<NodeType>, std::optional<int>, int,
-                    int, int, int, int, double, int, double, int, int, double, int>(),
+                    int, int, int, int, double, int, double, int, int, double, int, uint64_t>(),
            py::arg("max_budget"), py::arg("start_node_index") = std::nullopt,
            py::arg("end_node_type") = std::nullopt, py::arg("end_node_index") = std::nullopt,
            py::arg("end_time_limit") = -1, py::arg("breakfast_deadline") = -1,
@@ -62,7 +63,7 @@ PYBIND11_MODULE(paladio_core, m) {
            py::arg("max_active_time_before_fatigue") = 240,
            py::arg("fatigue_penalty_multiplier") = 0.6, py::arg("min_meal_spacing") = 180,
            py::arg("monotony_threshold") = 2, py::arg("monotony_multiplier") = 0.5,
-           py::arg("timeout_ms") = 5000)
+           py::arg("timeout_ms") = 5000, py::arg("max_nodes_expanded") = 0)
       .def_readwrite("max_budget", &OptimizationConfig::max_budget)
       .def_readwrite("start_node_index", &OptimizationConfig::start_node_index)
       .def_readwrite("end_node_type", &OptimizationConfig::end_node_type)
@@ -79,15 +80,22 @@ PYBIND11_MODULE(paladio_core, m) {
       .def_readwrite("min_meal_spacing", &OptimizationConfig::min_meal_spacing)
       .def_readwrite("monotony_threshold", &OptimizationConfig::monotony_threshold)
       .def_readwrite("monotony_multiplier", &OptimizationConfig::monotony_multiplier)
-      .def_readwrite("timeout_ms", &OptimizationConfig::timeout_ms);
+      .def_readwrite("timeout_ms", &OptimizationConfig::timeout_ms)
+      .def_readwrite("max_nodes_expanded", &OptimizationConfig::max_nodes_expanded);
 
   py::class_<OptimizationResult>(m, "OptimizationResult", "Optimal path returned by the solver.")
       .def_readwrite("path", &OptimizationResult::path, "Sequence of visited POI indices.")
+      .def_readwrite("arrival_times", &OptimizationResult::arrival_times,
+                     "Sequence of arrival times in minutes from midnight.")
       .def_readwrite("total_cost", &OptimizationResult::total_cost, "Accumulated financial cost.")
       .def_readwrite("total_time", &OptimizationResult::total_time,
                      "Total elapsed time in minutes.")
       .def_readwrite("total_score", &OptimizationResult::total_score,
-                     "Maximally accumulated score.");
+                     "Maximally accumulated score.")
+      .def_readwrite("nodes_expanded", &OptimizationResult::nodes_expanded,
+                     "Count of branch-and-bound nodes explored.")
+      .def_readwrite("timed_out", &OptimizationResult::timed_out,
+                     "True if search timed out or hit node expansion limit.");
 
   // The core takes std::vector, but we bind it via numpy array for zero-copy
   // FFI speed
@@ -116,10 +124,13 @@ PYBIND11_MODULE(paladio_core, m) {
         int *d_ptr = static_cast<int *>(dur_buf.ptr);
         double *c_ptr = static_cast<double *>(cost_buf.ptr);
 
-        // Release GIL for the core C++ loop to allow Python concurrent
-        // execution
-        py::gil_scoped_release release;
-        return optimize_itinerary(pois, d_ptr, c_ptr, config);
+        // Release GIL for the core C++ loop to allow Python concurrent execution
+        OptimizationResult result;
+        {
+          py::gil_scoped_release release;
+          result = optimize_itinerary(pois, d_ptr, c_ptr, config);
+        }
+        return result;
       },
       "Optimize travel constraints (TSPTW + Knapsack). Releases GIL during "
       "computation.");

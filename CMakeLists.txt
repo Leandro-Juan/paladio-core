@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(PaladioEngine VERSION 1.1.0 LANGUAGES CXX) # x-release-please-version
+project(PaladioEngine VERSION 1.2.0 LANGUAGES CXX) # x-release-please-version
 
 if(POLICY CMP0135)
   cmake_policy(SET CMP0135 NEW)

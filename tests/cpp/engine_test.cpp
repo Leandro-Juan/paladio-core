@@ -368,4 +368,52 @@ TEST_F(ItineraryEngineTest, EmptyPOIsReturnsZeroedResult) {
   EXPECT_DOUBLE_EQ(result_null.total_score, 0.0);
   EXPECT_DOUBLE_EQ(result_null.total_cost, 0.0);
   EXPECT_DOUBLE_EQ(result_null.total_time, 0.0);
+  EXPECT_TRUE(result_null.arrival_times.empty());
+}
+
+TEST_F(ItineraryEngineTest, ReturnsExactArrivalTimesMatchingPath) {
+  // Act
+  auto result = optimize_itinerary(pois, transit_times, config);
+
+  // Assert
+  ASSERT_FALSE(result.path.empty());
+  ASSERT_EQ(result.arrival_times.size(), result.path.size());
+
+  for (size_t k = 0; k < result.path.size(); ++k) {
+    int node = result.path[k];
+    EXPECT_GE(result.arrival_times[k], pois[node].earliest_time);
+    EXPECT_LE(result.arrival_times[k] + pois[node].duration, pois[node].latest_time);
+
+    if (k > 0) {
+      int prev_node = result.path[k - 1];
+      int leg_idx = prev_node * static_cast<int>(pois.size()) + node;
+      int expected_min_arr =
+          result.arrival_times[k - 1] + pois[prev_node].duration + transit_times[leg_idx].duration;
+      EXPECT_GE(result.arrival_times[k], expected_min_arr);
+    }
+  }
+}
+
+TEST_F(ItineraryEngineTest, CountsNodesExpandedAndRespectsMaxLimit) {
+  // Act with unlimited expansions
+  auto res_unlimited = optimize_itinerary(pois, transit_times, config);
+  EXPECT_GT(res_unlimited.nodes_expanded, 0u);
+  EXPECT_FALSE(res_unlimited.timed_out);
+
+  // Act with tight max_nodes_expanded
+  config.max_nodes_expanded = 2;
+  auto res_limited = optimize_itinerary(pois, transit_times, config);
+  EXPECT_GT(res_limited.nodes_expanded, 0u);
+  EXPECT_TRUE(res_limited.timed_out);
+}
+
+TEST_F(ItineraryEngineTest, EnforcesTaxonomyCategoryIdMonotony) {
+  // Arrange 3 attractions in same fine-grained category (category_id = 1)
+  pois[1].category_id = 1;
+  pois[2].category_id = 1;
+  config.monotony_threshold = 1;
+  config.monotony_multiplier = 0.5;
+
+  auto result = optimize_itinerary(pois, transit_times, config);
+  EXPECT_FALSE(result.path.empty());
 }

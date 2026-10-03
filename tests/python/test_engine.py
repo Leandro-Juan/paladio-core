@@ -257,3 +257,43 @@ def test_engine_resilience_malformed_input(default_config):
     # Act & Assert
     with pytest.raises(ValueError):
         paladio_core.optimize_itinerary(pois, durations, costs, default_config)
+
+
+def test_engine_returns_arrival_times_and_nodes_expanded():
+    """Verify arrival_times, nodes_expanded, and timed_out are returned accurately in Python."""
+    p0 = paladio_core.POI(
+        paladio_core.NodeType.HOTEL, 0.0, 0.0, 480, 1320, 0, False, 255
+    )
+    p1 = paladio_core.POI(
+        paladio_core.NodeType.ATTRACTION, 10.0, 100.0, 480, 1080, 60, False, 2
+    )
+    pois = [p0, p1]
+    durations = np.array([0, 20, 20, 0], dtype=np.int32)
+    costs = np.array([0.0, 1.5, 1.5, 0.0], dtype=np.float64)
+
+    # 1. Normal solve
+    cfg = paladio_core.OptimizationConfig(
+        100.0,
+        start_node_index=0,
+        end_node_index=0,
+        end_time_limit=1320,
+    )
+    res = paladio_core.optimize_itinerary(pois, durations, costs, cfg)
+
+    assert res.path == [0, 1, 0]
+    assert len(res.arrival_times) == 3
+    assert res.arrival_times == [480, 500, 580]
+    assert res.nodes_expanded > 0
+    assert not res.timed_out
+    assert p1.category_id == 2
+
+    # 2. Solver stops when max_nodes_expanded is hit
+    cfg_limited = paladio_core.OptimizationConfig(
+        100.0,
+        start_node_index=0,
+        end_node_index=0,
+        max_nodes_expanded=1,
+    )
+    res_limited = paladio_core.optimize_itinerary(pois, durations, costs, cfg_limited)
+    assert res_limited.timed_out
+    assert res_limited.nodes_expanded <= 2

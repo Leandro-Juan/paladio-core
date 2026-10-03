@@ -78,6 +78,9 @@ class POI:
     is_mandatory: bool
     """When true, candidate itineraries omitting this POI are considered infeasible."""
 
+    category_id: int
+    """Fine-grained taxonomy category index (0-15). Sentinel 255 falls back to type."""
+
     def __init__(
         self,
         type: NodeType,
@@ -87,6 +90,7 @@ class POI:
         latest_time: int,
         duration: int,
         is_mandatory: bool = False,
+        category_id: int = 255,
     ) -> None:
         """Constructs a POI and automatically pre-computes meal classification flags."""
         ...
@@ -147,6 +151,9 @@ class OptimizationConfig:
     timeout_ms: int
     """Maximum wall-clock execution time in milliseconds before search terminates (default: 5000)."""
 
+    max_nodes_expanded: int
+    """Upper bound on node expansions during search. 0 disables limit."""
+
     def __init__(
         self,
         max_budget: float,
@@ -165,6 +172,7 @@ class OptimizationConfig:
         monotony_threshold: int = 2,
         monotony_multiplier: float = 0.5,
         timeout_ms: int = 5000,
+        max_nodes_expanded: int = 0,
     ) -> None: ...
 
 class OptimizationResult:
@@ -172,6 +180,9 @@ class OptimizationResult:
 
     path: List[int]
     """Ordered sequence of visited POI node indices from start to terminal."""
+
+    arrival_times: List[int]
+    """Sequence of arrival times in minutes from midnight for each node in path."""
 
     total_cost: float
     """Total financial expenditure accumulated (visits + transits)."""
@@ -181,6 +192,12 @@ class OptimizationResult:
 
     total_score: float
     """Maximized cumulative objective score achieved under all physiological penalties."""
+
+    nodes_expanded: int
+    """Total count of branch-and-bound nodes explored during search."""
+
+    timed_out: bool
+    """True if search was halted by timeout_ms or max_nodes_expanded limit."""
 
 def optimize_itinerary(
     pois: List[POI],

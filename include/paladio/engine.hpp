@@ -61,6 +61,9 @@ struct POI {
   bool is_mandatory;    ///< When true, any candidate itinerary omitting this POI is considered
                         ///< infeasible and pruned.
 
+  uint8_t category_id =
+      255;  ///< Fine-grained taxonomy category index (0-15). Sentinel 255 falls back to NodeType.
+
   /**
    * @brief Default constructor for STL container compatibility and zero-initialization.
    */
@@ -76,9 +79,17 @@ struct POI {
    * @param l Latest closing time in minutes from midnight (@f$ e \le l \le 1440 @f$).
    * @param d Mandatory visit dwell duration in minutes (@f$ d \ge 0 @f$).
    * @param m Flag indicating if this POI is mandatory (@c true) or optional (@c false).
+   * @param cat_id Fine-grained category index (0-15), default 255 (use @p t).
    */
-  POI(NodeType t, double c, double s, int e, int l, int d, bool m = false)
-      : cost(c), score(s), earliest_time(e), latest_time(l), duration(d), type(t), is_mandatory(m) {
+  POI(NodeType t, double c, double s, int e, int l, int d, bool m = false, uint8_t cat_id = 255)
+      : cost(c),
+        score(s),
+        earliest_time(e),
+        latest_time(l),
+        duration(d),
+        type(t),
+        is_mandatory(m),
+        category_id(cat_id) {
     is_breakfast_spot = (t == NodeType::RESTAURANT_BREAKFAST);
     is_lunch_spot = (t == NodeType::RESTAURANT_LUNCH);
     is_dinner_spot = (t == NodeType::RESTAURANT_DINNER);
@@ -140,6 +151,8 @@ struct OptimizationConfig {
             ///< @f$ s' = s \times \mu_{\text{monotony}}^{k - \tau + 1} @f$.
   int timeout_ms = 5000;  ///< Maximum wall-clock execution time in milliseconds before search
                           ///< terminates and returns incumbent best.
+  uint64_t max_nodes_expanded =
+      0;  ///< Upper bound on node expansions during search. Sentinel @c 0 disables limit.
 };
 
 /**
@@ -148,11 +161,15 @@ struct OptimizationConfig {
 struct OptimizationResult {
   std::vector<int> path;  ///< Ordered sequence of visited POI node indices from start to terminal.
                           ///< Empty if no feasible path satisfies constraints.
-  double total_cost;      ///< Total financial expenditure accumulated (visits + transits).
+  std::vector<int>
+      arrival_times;   ///< Arrival times in minutes from midnight for each node in path.
+  double total_cost;   ///< Total financial expenditure accumulated (visits + transits).
   double total_time;   ///< Total elapsed itinerary duration in minutes (arrival at final node minus
                        ///< start departure).
   double total_score;  ///< Maximized cumulative objective score achieved under all physiological
                        ///< penalties.
+  uint64_t nodes_expanded = 0;  ///< Total count of branch-and-bound nodes explored during search.
+  bool timed_out = false;  ///< True if search was halted by timeout_ms or max_nodes_expanded limit.
 };
 
 /**

@@ -40,7 +40,9 @@ struct SearchState {
   bool had_dinner = false;     ///< True if a valid dinner milestone has been fulfilled.
   int last_meal_time = -9999;  ///< Departure minute of most recent meal (for spacing enforcement).
   int continuous_active_time = 0;  ///< Consecutive active minutes accumulated without a rest stop.
-  std::array<uint8_t, 8> category_visits = {0};  ///< Frequency histogram per @ref NodeType.
+  std::array<uint8_t, 8> category_visits = {0};     ///< Frequency histogram per @ref NodeType.
+  std::array<uint8_t, 16> taxonomy_visits = {0};    ///< Frequency histogram per category_id (0-15).
+  std::array<int, 64> current_arrival_times = {0};  ///< Stack-allocated sequence of arrival times.
   std::array<int, 64> current_path;  ///< Stack-allocated sequence of visited POI indices.
   int current_path_size = 0;         ///< Current depth/length of the trajectory.
 };
@@ -202,8 +204,11 @@ void dfs(int u, SearchState &state, const POI *pois, const int *transit_duration
          const int *sorted_pois_by_density, const int *density_rank, int min_transit_global, int n,
          std::unordered_map<MemoKey, std::vector<MemoEntry>, MemoKeyHash> &memo,
          uint64_t global_mandatory_mask, OptimizationResult &best_result,
-         const std::chrono::steady_clock::time_point &start_time, int &node_eval_count) {
+         const std::chrono::steady_clock::time_point &start_time, uint64_t &node_eval_count) {
   node_eval_count++;
+  if (config.max_nodes_expanded > 0 && node_eval_count >= config.max_nodes_expanded) {
+    throw TimeoutException();
+  }
   if ((node_eval_count & 1023) == 0) {
     auto now = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() >
@@ -353,7 +358,12 @@ void dfs(int u, SearchState &state, const POI *pois, const int *transit_duration
         next_continuous_active_time += transit_durations[u * n + v] + pois[v].duration;
       }
 
-      uint8_t category_count = state.category_visits[static_cast<size_t>(pois[v].type)];
+      uint8_t category_count = 0;
+      if (pois[v].category_id != 255 && pois[v].category_id < 16) {
+        category_count = state.taxonomy_visits[pois[v].category_id];
+      } else {
+        category_count = state.category_visits[static_cast<size_t>(pois[v].type)];
+      }
       if (category_count >= config.monotony_threshold) {
         node_score *=
             std::pow(config.monotony_multiplier, category_count - config.monotony_threshold + 1);
@@ -419,7 +429,12 @@ void dfs(int u, SearchState &state, const POI *pois, const int *transit_duration
       state.had_dinner = next_had_dinner;
       state.last_meal_time = next_last_meal_time;
       state.continuous_active_time = next_continuous_active_time;
-      state.category_visits[static_cast<size_t>(pois[v].type)]++;
+      if (pois[v].category_id != 255 && pois[v].category_id < 16) {
+        state.taxonomy_visits[pois[v].category_id]++;
+      } else {
+        state.category_visits[static_cast<size_t>(pois[v].type)]++;
+      }
+      state.current_arrival_times[state.current_path_size] = arrival_time;
       state.current_path[state.current_path_size++] = v;
 
       dfs(v, state, pois, transit_durations, transit_costs, config, sorted_pois_by_density,
@@ -427,7 +442,11 @@ void dfs(int u, SearchState &state, const POI *pois, const int *transit_duration
           node_eval_count);
 
       state.current_path_size--;
-      state.category_visits[static_cast<size_t>(pois[v].type)]--;
+      if (pois[v].category_id != 255 && pois[v].category_id < 16) {
+        state.taxonomy_visits[pois[v].category_id]--;
+      } else {
+        state.category_visits[static_cast<size_t>(pois[v].type)]--;
+      }
       state.continuous_active_time = prev_continuous_active_time;
       state.last_meal_time = prev_last_meal_time;
       state.had_dinner = prev_dinner;
@@ -551,8 +570,12 @@ void dfs(int u, SearchState &state, const POI *pois, const int *transit_duration
     if (is_better) {
       best_result.path.assign(state.current_path.begin(),
                               state.current_path.begin() + state.current_path_size);
+      best_result.arrival_times.assign(
+          state.current_arrival_times.begin(),
+          state.current_arrival_times.begin() + state.current_path_size);
       if (final_path_size > static_cast<size_t>(state.current_path_size)) {
         best_result.path.push_back(config.end_node_index.value());
+        best_result.arrival_times.push_back(arrival_at_end);
       }
       best_result.total_cost = final_cost;
       best_result.total_time = final_time;
@@ -658,7 +681,7 @@ OptimizationResult optimize_itinerary(const std::vector<POI> &pois, const int *t
   std::unordered_map<MemoKey, std::vector<MemoEntry>, MemoKeyHash> memo;
 
   auto start_time = std::chrono::steady_clock::now();
-  int node_eval_count = 0;
+  uint64_t node_eval_count = 0;
 
   const POI *pois_ptr = pois.data();
   const int *sorted_pois_ptr = sorted_pois_by_density.data();
@@ -693,6 +716,7 @@ OptimizationResult optimize_itinerary(const std::vector<POI> &pois, const int *t
     state.had_breakfast = pois[start_node].is_breakfast_spot;
     state.had_lunch = false;
     state.had_dinner = false;
+    state.current_arrival_times[state.current_path_size] = arrival_start;
     state.current_path[state.current_path_size++] = start_node;
 
     bool is_strict_meal = (pois[start_node].type == NodeType::RESTAURANT_BREAKFAST ||
@@ -706,7 +730,11 @@ OptimizationResult optimize_itinerary(const std::vector<POI> &pois, const int *t
     } else {
       state.continuous_active_time = pois[start_node].duration;
     }
-    state.category_visits[static_cast<size_t>(pois[start_node].type)] = 1;
+    if (pois[start_node].category_id != 255 && pois[start_node].category_id < 16) {
+      state.taxonomy_visits[pois[start_node].category_id] = 1;
+    } else {
+      state.category_visits[static_cast<size_t>(pois[start_node].type)] = 1;
+    }
 
     if (config.breakfast_deadline != -1 && state.current_time > config.breakfast_deadline &&
         !state.had_breakfast)
@@ -723,14 +751,18 @@ OptimizationResult optimize_itinerary(const std::vector<POI> &pois, const int *t
           density_rank_ptr, min_transit_global, n, memo, global_mandatory_mask, best_result,
           start_time, node_eval_count);
     } catch (const TimeoutException &) {
+      best_result.timed_out = true;
       break;
     }
   }
 
+  best_result.nodes_expanded = node_eval_count;
   if (best_result.total_score == -1.0) {
     best_result.total_cost = 0.0;
     best_result.total_score = 0.0;
     best_result.total_time = 0.0;
+    best_result.path.clear();
+    best_result.arrival_times.clear();
   }
 
   return best_result;
