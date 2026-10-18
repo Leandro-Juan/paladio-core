@@ -30,17 +30,6 @@ class NodeType(enum.Enum):
     BAR: int
     """Nightlife or social venue. Functions as a rest node."""
 
-class TransitInfo:
-    """Represents a directed weighted edge connecting two POIs in the metric graph."""
-
-    duration: int
-    """Direct travel duration in minutes between origin and destination nodes (>= 0)."""
-
-    cost: float
-    """Financial transit expenditure (fare, fuel, toll) in currency units (>= 0.0)."""
-
-    def __init__(self, duration: int, cost: float) -> None: ...
-
 class POI:
     """A Point of Interest (POI) vertex in the routing network.
 
@@ -222,5 +211,35 @@ def optimize_itinerary(
     Raises:
         ValueError: If N > 64, if transit arrays have mismatched lengths or are not 1D,
                     or if start/end node indices are out of bounds.
+    """
+    ...
+
+def solve_tsp_tour(
+    durations: npt.NDArray[np.int32] | Any,
+    n: int,
+    start_node: int = 0,
+    end_node: int = -1,
+    fixed_end: bool = False,
+) -> List[int]:
+    """Computes a non-crossing, minimal-duration TSP tour over n nodes using C++20 local search.
+
+    Releases GIL during computation.
+    """
+    ...
+
+def solve_tsptw(
+    durations: npt.NDArray[np.int32] | Any,
+    n: int,
+    dwell_times: npt.NDArray[np.int32] | Any,
+    window_starts: npt.NDArray[np.int32] | Any,
+    window_ends: npt.NDArray[np.int32] | Any,
+    start_node: int = 0,
+    end_node: int = -1,
+    fixed_end: bool = False,
+    penalty_weight: float = 100.0,
+) -> List[int]:
+    """Computes a TSP tour respecting time windows and dwell times.
+
+    Releases GIL during computation.
     """
     ...

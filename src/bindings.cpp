@@ -30,11 +30,6 @@ PYBIND11_MODULE(paladio_core, m) {
       .value("BAR", NodeType::BAR)
       .export_values();
 
-  py::class_<TransitInfo>(m, "TransitInfo", "Travel edge connecting two POIs.")
-      .def(py::init<int, double>())
-      .def_readwrite("duration", &TransitInfo::duration, "Travel duration in minutes.")
-      .def_readwrite("cost", &TransitInfo::cost, "Financial cost of travel.");
-
   py::class_<POI>(m, "POI", "A Point of Interest node in the itinerary network.")
       .def(py::init<NodeType, double, double, int, int, int, bool, uint8_t>(), py::arg("type"),
            py::arg("cost"), py::arg("score"), py::arg("earliest_time"), py::arg("latest_time"),
@@ -134,4 +129,76 @@ PYBIND11_MODULE(paladio_core, m) {
       },
       "Optimize travel constraints (TSPTW + Knapsack). Releases GIL during "
       "computation.");
+
+  m.def(
+      "solve_tsp_tour",
+      [](py::array_t<int, py::array::c_style | py::array::forcecast> durations, int n,
+         int start_node, int end_node, bool fixed_end) -> std::vector<int> {
+        py::buffer_info dur_buf = durations.request();
+        if (dur_buf.ndim != 1) {
+          throw py::value_error("Transit duration matrix must be a flattened 1D array.");
+        }
+        size_t expected_size = static_cast<size_t>(n) * static_cast<size_t>(n);
+        if (dur_buf.shape[0] != static_cast<py::ssize_t>(expected_size)) {
+          throw py::value_error("Transit matrix must have size exactly equal to N*N.");
+        }
+        const int *d_ptr = static_cast<const int *>(dur_buf.ptr);
+
+        std::vector<int> result;
+        {
+          py::gil_scoped_release release;
+          result = solve_tsp_tour(d_ptr, n, start_node, end_node, fixed_end);
+        }
+        return result;
+      },
+      py::arg("durations"), py::arg("n"), py::arg("start_node") = 0, py::arg("end_node") = -1,
+      py::arg("fixed_end") = false,
+      "Computes a non-crossing, minimal-duration TSP tour over n nodes using C++20 local search. "
+      "Releases GIL during computation.");
+
+  m.def(
+      "solve_tsptw",
+      [](py::array_t<int, py::array::c_style | py::array::forcecast> durations, int n,
+         py::array_t<int, py::array::c_style | py::array::forcecast> dwell_times,
+         py::array_t<int, py::array::c_style | py::array::forcecast> window_starts,
+         py::array_t<int, py::array::c_style | py::array::forcecast> window_ends, int start_node,
+         int end_node, bool fixed_end, double penalty_weight) -> std::vector<int> {
+        py::buffer_info dur_buf = durations.request();
+        py::buffer_info dwell_buf = dwell_times.request();
+        py::buffer_info win_s_buf = window_starts.request();
+        py::buffer_info win_e_buf = window_ends.request();
+
+        if (dur_buf.ndim != 1) {
+          throw py::value_error("Transit duration matrix must be a flattened 1D array.");
+        }
+        size_t expected_size = static_cast<size_t>(n) * static_cast<size_t>(n);
+        if (dur_buf.shape[0] != static_cast<py::ssize_t>(expected_size)) {
+          throw py::value_error("Transit matrix must have size exactly equal to N*N.");
+        }
+        if (dwell_buf.shape[0] != static_cast<py::ssize_t>(n) ||
+            win_s_buf.shape[0] != static_cast<py::ssize_t>(n) ||
+            win_e_buf.shape[0] != static_cast<py::ssize_t>(n)) {
+          throw py::value_error(
+              "dwell_times, window_starts, and window_ends must have size equal to N.");
+        }
+
+        const int *d_ptr = static_cast<const int *>(dur_buf.ptr);
+        const int *dwell_ptr = static_cast<const int *>(dwell_buf.ptr);
+        const int *win_s_ptr = static_cast<const int *>(win_s_buf.ptr);
+        const int *win_e_ptr = static_cast<const int *>(win_e_buf.ptr);
+
+        std::vector<int> result;
+        {
+          py::gil_scoped_release release;
+          result = solve_tsptw(d_ptr, n, dwell_ptr, win_s_ptr, win_e_ptr, start_node, end_node,
+                               fixed_end, penalty_weight);
+        }
+        return result;
+      },
+      py::arg("durations"), py::arg("n"), py::arg("dwell_times"), py::arg("window_starts"),
+      py::arg("window_ends"), py::arg("start_node") = 0, py::arg("end_node") = -1,
+      py::arg("fixed_end") = false, py::arg("penalty_weight") = 100.0,
+      "Computes a global TSPTW tour over n nodes with soft time-window penalties using C++20 local "
+      "search. "
+      "Releases GIL during computation.");
 }
